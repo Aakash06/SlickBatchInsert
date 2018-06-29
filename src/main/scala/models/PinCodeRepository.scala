@@ -1,11 +1,15 @@
 package models
 
-import scala.slick.driver.MySQLDriver.simple._
-import com.github.tototoshi.slick.MySQLJodaSupport._
-import models.PinCodeInformation.{db, pinCodeQuery}
 import org.joda.time.DateTime
-import scala.slick.driver.MySQLDriver
-import scala.slick.lifted.{ProvenShape, TableQuery}
+import com.github.tototoshi.slick.MySQLJodaSupport._
+import slick.jdbc.MySQLProfile.api._
+import slick.lifted.ProvenShape.proveShapeOf
+import PinCodeInformation.db
+import slick.dbio.Effect
+import slick.sql.FixedSqlAction
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 case class PinCode(id: Long,
                    profileId: Option[Long],
@@ -14,37 +18,41 @@ case class PinCode(id: Long,
                    used: Boolean,
                    created: Option[DateTime])
 
-object FoxPinCodeRepository {
+trait FoxPinCodeRepository extends PinCodeTable {
 
-  def insert(pinCodes: PinCode): Int =
+  /*def insert(pinCodes: PinCode): Int =
     db.withSession { implicit session =>
       pinCodeQuery.insert(pinCodes)
-    }
+    }*/
 
-  def batchInsert(pinCodes: List[PinCode]): Option[Int] =
-    db.withSession { implicit session =>
-      pinCodeQuery.insertAll(pinCodes: _*)
-    }
+  def batchInsert(pinCodes: List[PinCode]): Future[Option[Int]] =
+    db.run(pinCodeQuery ++= pinCodes)
 
 }
 
 object PinCodeInformation {
-  val db: MySQLDriver.backend.DatabaseDef = Database.forDataSource(DBProductionShowman.ds)
-  val pinCodeQuery: TableQuery[PinCodeInformation] = TableQuery[PinCodeInformation]
+  val db = Database.forConfig("mysql")
 }
 
-private[models] class PinCodeInformation(tag: Tag) extends Table[PinCode](tag, "pin_code") {
-  def id: Column[Long] = column[Long]("id", O.PrimaryKey, O.AutoInc)
+trait PinCodeTable {
 
-  def profileId: Column[Option[Long]] = column[Option[Long]]("profile_id")
+  val pinCodeQuery: TableQuery[PinCodeInformation] = TableQuery[PinCodeInformation]
 
-  def receiptId: Column[Option[String]] = column[Option[String]]("snap3_receipt_id")
+  class PinCodeInformation(tag: Tag) extends Table[PinCode](tag, "pin_code") {
 
-  def code: Column[String] = column[String]("code")
+    def id: Rep[Long] = column[Long]("id", O.PrimaryKey, O.AutoInc)
 
-  def used: Column[Boolean] = column[Boolean]("used")
+    def profileId: Rep[Option[Long]] = column[Option[Long]]("profile_id")
 
-  def created: Column[Option[DateTime]] = column[Option[DateTime]]("created_date")
+    def receiptId: Rep[Option[String]] = column[Option[String]]("snap3_receipt_id")
 
-  def * : ProvenShape[PinCode] = (id, profileId, receiptId, code, used, created) <> (PinCode.tupled, PinCode.unapply)
+    def code: Rep[String] = column[String]("code")
+
+    def used: Rep[Boolean] = column[Boolean]("used")
+
+    def created: Rep[Option[DateTime]] = column[Option[DateTime]]("created_date")
+
+    def * = (id, profileId, receiptId, code, used, created) <> (PinCode.tupled, PinCode.unapply)
+  }
+
 }

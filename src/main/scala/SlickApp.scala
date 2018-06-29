@@ -1,11 +1,12 @@
 import models.{FoxPinCodeRepository, PinCode}
 import org.joda.time.DateTime
 
+import scala.concurrent.Await
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 import scala.io.{BufferedSource, Source}
 
-object SlickApp extends App {
-
-  val pinCodeRepository: FoxPinCodeRepository.type = FoxPinCodeRepository
+object SlickApp extends App with FoxPinCodeRepository {
 
   val codesSource: BufferedSource = Source.fromFile("/home/akshay/Downloads/3tl/abc.csv")
   val codes: List[String] = codesSource.getLines().toList
@@ -23,9 +24,9 @@ object SlickApp extends App {
   pinCodesList.grouped(5000).foreach { pinCode =>
     count += 1
     println("Inserting codes group" + count)
-    val insertResult = pinCodeRepository.batchInsert(pinCode)
-    println("Insert result for code " + count + " is " + insertResult)
-    insertResult
+    val a = Await.result(batchInsert(pinCode), 15.seconds)
+      println("Insert result for code " + count + " is " + a)
+
   }
 
 }
